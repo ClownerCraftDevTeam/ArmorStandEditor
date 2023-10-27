@@ -19,6 +19,10 @@
 
 package io.github.rypofalem.armorstandeditor;
 
+import org.bukkit.util.EulerAngle;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
+
 public abstract class Util {
 
     public static final double FULL_CIRCLE = Math.PI * 2;
@@ -65,5 +69,26 @@ public abstract class Util {
         }
 
         return angle;
+    }
+
+    /**
+     * Converts Euler Angles to a quaternion
+     * @param euler an XYZ euler angle
+     * @return a float Quaternion
+     */
+    public static Quaternionf eulerToQuaternion(EulerAngle euler) {
+        Quaternionf out = new Quaternionf();
+        out.rotateXYZ((float) euler.getX(), (float) euler.getY(), (float) euler.getZ());
+        return out;
+    }
+
+    /**
+     * Converts a Quaternion to Euler Angle - for Display Entities
+     * @param quaternion - the quaternion to convert
+     * @return an EulerAngle (XYZ order)
+     */
+    public static EulerAngle quaternionToEuler(Quaternionf quaternion) {
+        Vector3f euler = quaternion.getEulerAnglesXYZ(new Vector3f());
+        return new EulerAngle(euler.x,euler.y,euler.z);
     }
 }

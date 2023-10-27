@@ -42,18 +42,8 @@ public enum DisplayEditMode {
     SHADOW_RADIUS("ShadowRadius"),
     SHADOW_STRENGTH("ShadowStrength"),
 
-    //TODO these may need to be a sub menu...
-    ITEM("ItemStack"), //NB: Also used to set BlockDisplay -> ItemStack->Material->BlockData
-    ITEM_MODE("ItemDisplayMode"),
-
-    BLOCK_DATA("BlockData"),
-
-    TEXT("Text"),
-    TEXT_ALIGN("TextAlighnment"),
-    TEXT_BACKGROUND("TextBackgroundColor"),
-    TEXT_LINEWIDTH("TextMaxLineWidth"),
-    TEXT_OPACITY("TextOpacity"),
-    TEXT_SHADOW("TextShadow");
+    EQUIPMENT("Equipment"),
+    TEXT("Text");
 
     private String name;
 

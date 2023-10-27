@@ -37,8 +37,7 @@ import java.util.UUID;
 
 public class PlayerDisplayEditor {
     public ArmorStandEditorPlugin plugin;
-    private UUID uuid;
-    UUID armorStandID;
+    private final UUID uuid;
     DisplayEditMode eMode;
     AdjustmentMode adjMode;
     CopySlots copySlots;
@@ -46,6 +45,7 @@ public class PlayerDisplayEditor {
     double eulerAngleChange;
     double degreeAngleChange;
     double movChange;
+    float scaleChange;
     DisplayMenu chestMenu;
     Display target;
     ArrayList<Display> targetList = null;
@@ -66,6 +66,8 @@ public class PlayerDisplayEditor {
         chestMenu = new DisplayMenu(this);
     }
 
+    // Mode toggles
+
     public void setMode(DisplayEditMode editMode) {
         this.eMode = editMode;
         sendMessage("setmode", editMode.toString().toLowerCase());
@@ -78,13 +80,22 @@ public class PlayerDisplayEditor {
 
     public void setAdjMode(AdjustmentMode adjMode) {
         this.adjMode = adjMode;
-        if (adjMode == AdjustmentMode.COARSE) {
-            eulerAngleChange = getManager().coarseAdj;
-            movChange = getManager().coarseMov;
-        } else {
-            eulerAngleChange = getManager().fineAdj;
-            movChange = getManager().fineMov;
+        switch (adjMode) {
+            case COARSE -> {
+                eulerAngleChange = getManager().coarseAdj;
+                movChange = getManager().coarseMov;
+                scaleChange = (float) getManager().coarseMov; //TODO tweak this
+            }
+            case MEDIUM -> {
+                //TODO implement
+            }
+            case FINE -> {
+                eulerAngleChange = getManager().fineAdj;
+                movChange = getManager().fineMov;
+                scaleChange = (float) getManager().coarseMov; //TODO tweak this
+            }
         }
+
         degreeAngleChange = eulerAngleChange / Math.PI * 180;
         sendMessage("setadj", adjMode.toString().toLowerCase());
     }
@@ -94,87 +105,47 @@ public class PlayerDisplayEditor {
         sendMessage("setslot", String.valueOf((slot + 1)));
     }
 
-    public void editDisplay(Display displayEntity) { //TODO
-        if (getPlayer().hasPermission("asedit.basic")) {
+    void cycleAxis(int i) {
+        int index = axis.ordinal();
+        index += i;
+        index = index % Axis.values().length;
+        while (index < 0) {
+            index += Axis.values().length;
+        }
+        setAxis(Axis.values()[index]);
+    }
 
+    // Do the edit
+
+    public void performEdit(Display displayEntity, boolean reversed) {
+        if (getPlayer().hasPermission("asedit.basic")) {
             displayEntity = attemptTarget(displayEntity);
             switch (eMode) {
-                case YAW:
-                    rotateYaw(displayEntity);
-                    break;
-                case PITCH:
-                    rotatePitch(displayEntity);
-                    break;
-                case COPY:
-                    copy(displayEntity);
-                    break;
-                case PASTE:
-                    paste(displayEntity);
-                    break;
-                case DELETE:
-                    break;
-                case PLACEMENT:
-                    move(displayEntity);
-                    break;
-                case RESET:
-                    resetPosition(displayEntity);
-                    break;
-                case GLOWING:
-                    toggleGlowing(displayEntity);
-                    break;
-                case SCALE: //TODO
-                    break;
-                case LEFT_ROTATE: //TODO
-                    break;
-                case RIGHT_ROTATE: //TODO
-                    break;
-                case GLOW_COLOR: //TODO
-                    break;
-                case BILLBOARD: //TODO
-                    break;
-                case BLOCK_LIGHT: //TODO
-                    break;
-                case SKY_LIGHT: //TODO
-                    break;
-                case SHADOW_RADIUS: //TODO
-                    break;
-                case SHADOW_STRENGTH: //TODO
-                    break;
-                case ITEM: //TODO
-                    break;
-                case ITEM_MODE: //TODO
-                    break;
-                case BLOCK_DATA: //TODO
-                    break;
-                case TEXT: //TODO
-                    break;
-                case TEXT_ALIGN: //TODO
-                    break;
-                case TEXT_BACKGROUND: //TODO
-                    break;
-                case TEXT_LINEWIDTH: //TODO
-                    break;
-                case TEXT_OPACITY: //TODO
-                    break;
-                case TEXT_SHADOW: //TODO
-                    break;
-                case NONE:
-                default:
-                    sendMessage("nomode", null);
-                    break;
-
+                case YAW -> rotateYaw(displayEntity,reversed);
+                case PITCH -> rotatePitch(displayEntity,reversed);
+                case COPY -> copy(displayEntity);
+                case PASTE -> paste(displayEntity);
+                case DELETE -> delete(displayEntity);
+                case PLACEMENT -> move(displayEntity,reversed);
+                case RESET -> resetPosition(displayEntity);
+                case GLOWING -> toggleGlowing(displayEntity);
+                case SCALE -> scale(displayEntity,reversed);
+                case LEFT_ROTATE -> rotateLeft(displayEntity,reversed);
+                case RIGHT_ROTATE -> rotateRight(displayEntity,reversed);
+                case BILLBOARD -> cycleBillboard(displayEntity);
+                case BLOCK_LIGHT -> blockLight(displayEntity,reversed);
+                case SKY_LIGHT -> skyLight(displayEntity,reversed);
+                case SHADOW_RADIUS -> shadowRadius(displayEntity,reversed);
+                case SHADOW_STRENGTH -> shadowStrength(displayEntity,reversed);
+                case GLOW_COLOR -> openGlowColorMenu(displayEntity);
+                case EQUIPMENT -> openEquipment(displayEntity);
+                case TEXT -> openTextMenu(displayEntity);
+                default -> sendMessage("nomode", null);
             }
-        }else return;
+        }
     }
 
-    private void openEquipment(ArmorStand armorStand) {
-        if (!getPlayer().hasPermission("asedit.equipment")) return;
-        //if (team != null && team.hasEntry(armorStand.getName())) return; //Do not allow editing if the ArmorStand is Disabled
-        //equipMenu = new EquipmentMenu(this, armorStand);
-        //TODO
-        equipMenu.open();
-    }
-
+    @Deprecated
     public void reverseEditDisplay(Display displayEntity) {
         if (!getPlayer().hasPermission("asedit.basic")) return;
 
@@ -185,90 +156,165 @@ public class PlayerDisplayEditor {
 
         displayEntity = attemptTarget(displayEntity); //TODO fix
         switch (eMode) {
-            case PLACEMENT:
-                reverseMove(displayEntity);
-                break;
-            case YAW:
-                reverseRotateYaw(displayEntity);
-                break;
-            case PITCH:
-                reverseRotatePitch(displayEntity);
-                break;
-            default:
-                editDisplay(displayEntity);
+            case PLACEMENT -> move(displayEntity, true);
+            case YAW -> rotateYaw(displayEntity, true);
+            case PITCH -> rotatePitch(displayEntity, true);
+            default -> performEdit(displayEntity, false);
         }
     }
 
-    private void move(Display displayEntity) {
+    // Menus
+
+    public void openMenu() {
+        if (!isMenuCancelled()) {
+            Scheduler.runTaskLater(plugin, new OpenMenuTask(), 1);
+        }
+    }
+
+    public void cancelOpenMenu() {
+        lastCancelled = getManager().getTime();
+    }
+
+    boolean isMenuCancelled() {
+        return getManager().getTime() - lastCancelled < 2;
+    }
+
+    private class OpenMenuTask implements Runnable {
+
+        @Override
+        public void run() {
+            if (isMenuCancelled()) return;
+
+            //API: PlayerOpenMenuEvent
+            PlayerOpenMenuEvent event = new PlayerOpenMenuEvent(getPlayer());
+            Bukkit.getPluginManager().callEvent(event); //TODO: Folia Refactor
+            if (event.isCancelled()) return;
+
+            chestMenu.openMenu();
+        }
+    }
+
+    private void openEquipment(Display display) {
+        if (!getPlayer().hasPermission("asedit.equipment")) return;
+        //if (team != null && team.hasEntry(armorStand.getName())) return; //Do not allow editing if the ArmorStand is Disabled
+        //equipMenu = new EquipmentMenu(this, armorStand);
+        //TODO
+        equipMenu.open();
+    }
+
+    private void openGlowColorMenu(Display display) {
+        //TODO
+    }
+
+    private void openTextMenu(Display display) {
+        //TODO
+    }
+
+    // Edit Methods
+    
+    private void move(Display displayEntity, boolean reverse) {
         if (!getPlayer().hasPermission("asedit.movement")) return;
 
         //Generate a new ArmorStandManipulationEvent and call it out. //TODO make a display entity version
-        //ArmorStandManipulatedEvent event = new ArmorStandManipulatedEvent(displayEntity, getPlayer());
-        //Bukkit.getPluginManager().callEvent(event); // Bukkit handles the call out //TODO: Folia Refactor
-        //if (event.isCancelled()) return; //do nothing if cancelled
+        ArmorStandManipulatedEvent event = new ArmorStandManipulatedEvent(null, getPlayer());
+        Bukkit.getPluginManager().callEvent(event); // Bukkit handles the call out //TODO: Folia Refactor
+        if (event.isCancelled()) return; //do nothing if cancelled
 
         Location loc = displayEntity.getLocation();
         switch (axis) {
-            case X:
-                loc.add(movChange, 0, 0);
-                break;
-            case Y:
-                loc.add(0, movChange, 0);
-                break;
-            case Z:
-                loc.add(0, 0, movChange);
-                break;
+            case X -> {
+                if (reverse) loc.subtract(movChange, 0, 0);
+                else loc.add(movChange, 0, 0);
+            }
+            case Y -> {
+                if (reverse) loc.subtract(0, movChange, 0);
+                else loc.add(0, movChange, 0);
+            }
+            case Z -> {
+                if (reverse) loc.subtract(0, 0, movChange);
+                else loc.add(0, 0, movChange);
+            }
         }
         Scheduler.teleport(displayEntity, loc);
     }
 
-    private void reverseMove(Display display) {
-        if (!getPlayer().hasPermission("asedit.movement")) return;
-        Location loc = display.getLocation();
-        switch (axis) {
-            case X:
-                loc.subtract(movChange, 0, 0);
-                break;
-            case Y:
-                loc.subtract(0, movChange, 0);
-                break;
-            case Z:
-                loc.subtract(0, 0, movChange);
-                break;
-        }
-        Scheduler.teleport(display, loc);
-    }
-
-    private void rotateYaw(Display display) {
+    private void rotateYaw(Display display, boolean reverse) {
         if (!getPlayer().hasPermission("asedit.rotation")) return;
         Location loc = display.getLocation();
         float yaw = loc.getYaw();
-        loc.setYaw((yaw + 180 + (float) degreeAngleChange) % 360 - 180);
+        if (reverse) loc.setYaw((yaw + 180 - (float) degreeAngleChange) % 360 - 180);
+        else loc.setYaw((yaw + 180 + (float) degreeAngleChange) % 360 - 180);
         Scheduler.teleport(display, loc);
     }
 
-    private void rotatePitch(Display display) {
+    private void rotatePitch(Display display, boolean reverse) {
         if (!getPlayer().hasPermission("asedit.rotation")) return;
         Location loc = display.getLocation();
         float pitch = loc.getPitch();
+        if (reverse) loc.setPitch((pitch + 180 - (float) degreeAngleChange) % 360 - 180);
         loc.setPitch((pitch + 180 + (float) degreeAngleChange) % 360 - 180);
         Scheduler.teleport(display, loc);
     }
 
-    private void reverseRotateYaw(Display display) {
-        if (!getPlayer().hasPermission("asedit.rotation")) return;
-        Location loc = display.getLocation();
-        float yaw = loc.getYaw();
-        loc.setYaw((yaw + 180 - (float) degreeAngleChange) % 360 - 180);
-        Scheduler.teleport(display, loc);
+    private void scale(Display display, boolean reverse) {
+        if (!getPlayer().hasPermission("asedit.display.scale")) return;
+
+        Transformation transformation = display.getTransformation();
+        switch (axis) {
+            case X -> {
+                if (reverse) transformation.getScale().sub(scaleChange, 0, 0);
+                else transformation.getScale().add(scaleChange, 0, 0);
+            }
+            case Y -> {
+                if (reverse) transformation.getScale().sub(0, scaleChange, 0);
+                else transformation.getScale().add(0, scaleChange, 0);
+            }
+            case Z -> {
+                if (reverse) transformation.getScale().sub(0, 0, scaleChange);
+                else transformation.getScale().add(0, 0, scaleChange);
+            }
+        }
+        //TODO implement a limit on scale
     }
 
-    private void reverseRotatePitch(Display display) {
-        if (!getPlayer().hasPermission("asedit.rotation")) return;
-        Location loc = display.getLocation();
-        float pitch = loc.getPitch();
-        loc.setPitch((pitch + 180 - (float) degreeAngleChange) % 360 - 180);
-        Scheduler.teleport(display, loc);
+    private void rotateLeft(Display display, boolean reverse) {
+        if (!getPlayer().hasPermission("asedit.display.rotate")) return; //TODO consistent perms
+
+        Transformation transformation = display.getTransformation();
+        switch (axis) {
+            case X -> {
+                if (reverse) transformation.getLeftRotation().rotateX((float) -eulerAngleChange);
+                else transformation.getLeftRotation().rotateX((float) eulerAngleChange);
+            }
+            case Y -> {
+                if (reverse) transformation.getLeftRotation().rotateY((float) -eulerAngleChange);
+                else transformation.getLeftRotation().rotateY((float) eulerAngleChange);
+            }
+            case Z -> {
+                if (reverse) transformation.getLeftRotation().rotateZ((float) -eulerAngleChange);
+                else transformation.getLeftRotation().rotateZ((float) eulerAngleChange);
+            }
+        }
+    }
+
+    private void rotateRight(Display display, boolean reverse) {
+        if (!getPlayer().hasPermission("asedit.display.rotate")) return; //TODO consistent perms
+
+        Transformation transformation = display.getTransformation();
+        switch (axis) {
+            case X -> {
+                if (reverse) transformation.getRightRotation().rotateX((float) -eulerAngleChange);
+                else transformation.getRightRotation().rotateX((float) eulerAngleChange);
+            }
+            case Y -> {
+                if (reverse) transformation.getRightRotation().rotateY((float) -eulerAngleChange);
+                else transformation.getRightRotation().rotateY((float) eulerAngleChange);
+            }
+            case Z -> {
+                if (reverse) transformation.getRightRotation().rotateZ((float) -eulerAngleChange);
+                else transformation.getRightRotation().rotateZ((float) eulerAngleChange);
+            }
+        }
     }
 
     private void copy(Display display) {
@@ -314,6 +360,11 @@ public class PlayerDisplayEditor {
         }
     } //TODO
 
+    private void delete(Display display) {
+        display.remove();
+        //TODO there's probably more that needs to happen here... like region checks or something
+    } //TODO
+
     private void resetPosition(Display displayEntity) {
         if (getPlayer().hasPermission("asedit.reset")) {
             displayEntity.setTransformation(new Transformation(new Vector3f(),new AxisAngle4f(),new Vector3f(1),new AxisAngle4f()));
@@ -322,61 +373,86 @@ public class PlayerDisplayEditor {
             sendMessage("nopermoption", "warn", "reset");
         }
     }
+    
+    private void cycleBillboard(Display displayEntity) {
+        if (!getPlayer().hasPermission("asedit.display.billboard")) return;
+        
+        switch (displayEntity.getBillboard()) {
+            case FIXED -> displayEntity.setBillboard(Display.Billboard.VERTICAL);
+            case VERTICAL -> displayEntity.setBillboard(Display.Billboard.HORIZONTAL);
+            case HORIZONTAL -> displayEntity.setBillboard(Display.Billboard.CENTER);
+            case CENTER -> displayEntity.setBillboard(Display.Billboard.FIXED);
+        }
+        //TODO notify player?
+    }
+    
+    private void blockLight(Display displayEntity, boolean reverse) {
+        if (!getPlayer().hasPermission("asedit.display.light")) return;
 
-    void toggleGlowing(Display display){
+        Display.Brightness current = displayEntity.getBrightness();
+        assert current != null;
+        displayEntity.setBrightness(new Display.Brightness(
+                current.getBlockLight() + ((reverse)? -1:1),
+                current.getSkyLight()));
+    }
+
+    private void skyLight(Display displayEntity, boolean reverse) {
+        if (!getPlayer().hasPermission("asedit.display.light")) return;
+
+        Display.Brightness current = displayEntity.getBrightness();
+        assert current != null;
+        displayEntity.setBrightness(new Display.Brightness(
+                current.getBlockLight(),
+                current.getSkyLight() + ((reverse)? -1:1)));
+    }
+
+    private void shadowRadius(Display displayEntity, boolean reverse) {
+        if (!getPlayer().hasPermission("asedit.display.shadow")) return;
+
+        //TODO this may need to scale with COARSE/FINE
+        displayEntity.setShadowRadius(displayEntity.getShadowRadius() + ((reverse)? -1:1));
+    }
+
+    private void shadowStrength(Display displayEntity, boolean reverse) {
+        if (!getPlayer().hasPermission("asedit.display.shadow")) return;
+
+        //TODO this may need to scale with COARSE/FINE
+        displayEntity.setShadowStrength(displayEntity.getShadowStrength() + ((reverse)? -0.1f:0.1f));
+    }
+
+    private void toggleGlowing(Display display) {
         if(getPlayer().hasPermission("asedit.togglearmorstandglow")){
-            //Will only make it glow white - Not something we can do like with Locking. Do not request this!
-            //Otherwise, this simple function becomes a mess to maintain. As you would need a Team generated with each
-            //Color and I ain't going to impose that on servers.
             display.setGlowing(!display.isGlowing());
         } else{
             sendMessage("nopermoption", "warn", "armorstandglow");
         }
     }
 
-    void cycleAxis(int i) {
-        int index = axis.ordinal();
-        index += i;
-        index = index % Axis.values().length;
-        while (index < 0) {
-            index += Axis.values().length;
-        }
-        setAxis(Axis.values()[index]);
-    }
+    //Angle tools
 
     private EulerAngle addEulerAngle(EulerAngle angle) {
         switch (axis) {
-            case X:
-                angle = angle.setX(Util.addAngle(angle.getX(), eulerAngleChange));
-                break;
-            case Y:
-                angle = angle.setY(Util.addAngle(angle.getY(), eulerAngleChange));
-                break;
-            case Z:
-                angle = angle.setZ(Util.addAngle(angle.getZ(), eulerAngleChange));
-                break;
-            default:
-                break;
+            case X -> angle = angle.setX(Util.addAngle(angle.getX(), eulerAngleChange));
+            case Y -> angle = angle.setY(Util.addAngle(angle.getY(), eulerAngleChange));
+            case Z -> angle = angle.setZ(Util.addAngle(angle.getZ(), eulerAngleChange));
+            default -> {
+            }
         }
         return angle;
     }
 
     private EulerAngle subEulerAngle(EulerAngle angle) {
         switch (axis) {
-            case X:
-                angle = angle.setX(Util.subAngle(angle.getX(), eulerAngleChange));
-                break;
-            case Y:
-                angle = angle.setY(Util.subAngle(angle.getY(), eulerAngleChange));
-                break;
-            case Z:
-                angle = angle.setZ(Util.subAngle(angle.getZ(), eulerAngleChange));
-                break;
-            default:
-                break;
+            case X -> angle = angle.setX(Util.subAngle(angle.getX(), eulerAngleChange));
+            case Y -> angle = angle.setY(Util.subAngle(angle.getY(), eulerAngleChange));
+            case Z -> angle = angle.setZ(Util.subAngle(angle.getZ(), eulerAngleChange));
+            default -> {
+            }
         }
         return angle;
     }
+
+    // Targetting
 
     public void setTarget(ArrayList<Display> displays) {
         if (displays == null || displays.isEmpty()) {
@@ -411,7 +487,7 @@ public class PlayerDisplayEditor {
 
             target = targetList.get(targetIndex);
             highlight(target); //NOTE: If Targeted and Locked, it displays the TEAM Color Glow: RED
-            //      Otherwise, its unlocked and will display WHITE as its not in a team by default
+            //      Otherwise, its unlocked and will display WHITE as it's not in a team by default
 
         }
     }
@@ -425,6 +501,15 @@ public class PlayerDisplayEditor {
         display = target;
         return display;
     }
+
+    private void highlight(Display display) {
+        if (!display.isGlowing()) {
+            display.setGlowing(true);
+            Bukkit.getScheduler().runTaskLater(plugin,() -> display.setGlowing(false),50);
+        } //TODO folia
+    }
+
+    // Misc
 
     void sendMessage(String path, String format, String option) {
         String message = plugin.getLang().getMessage(path, format, option);
@@ -445,13 +530,6 @@ public class PlayerDisplayEditor {
         sendMessage(path, "info", option);
     }
 
-    private void highlight(Display display) {
-        if (!display.isGlowing()) {
-            display.setGlowing(true);
-            Bukkit.getScheduler().runTaskLater(plugin,() -> display.setGlowing(false),50);
-        } //TODO folia
-    }
-
     public PlayerEditorManager getManager() {
         return plugin.editorManager;
     }
@@ -462,34 +540,5 @@ public class PlayerDisplayEditor {
 
     public UUID getUUID() {
         return uuid;
-    }
-
-    public void openMenu() {
-        if (!isMenuCancelled()) {
-            Scheduler.runTaskLater(plugin, new OpenMenuTask(), 1);
-        }
-    }
-
-    public void cancelOpenMenu() {
-        lastCancelled = getManager().getTime();
-    }
-
-    boolean isMenuCancelled() {
-        return getManager().getTime() - lastCancelled < 2;
-    }
-
-    private class OpenMenuTask implements Runnable {
-
-        @Override
-        public void run() {
-            if (isMenuCancelled()) return;
-
-            //API: PlayerOpenMenuEvent
-            PlayerOpenMenuEvent event = new PlayerOpenMenuEvent(getPlayer());
-            Bukkit.getPluginManager().callEvent(event); //TODO: Folia Refactor
-            if (event.isCancelled()) return;
-
-            chestMenu.openMenu();
-        }
     }
 }
