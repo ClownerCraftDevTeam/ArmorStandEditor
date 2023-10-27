@@ -51,6 +51,7 @@ import java.util.UUID;
 public class PlayerEditorManager implements Listener {
     private ArmorStandEditorPlugin plugin;
     private HashMap<UUID, PlayerEditor> players;
+    private HashMap<UUID, PlayerDisplayEditor> playersDisplay; //TODO handle
     private ASEHolder menuHolder = new ASEHolder(); //Inventory holder that owns the main ase menu inventories for the plugin
     private ASEHolder equipmentHolder = new ASEHolder(); //Inventory holder that owns the equipment menu
     double coarseAdj;
